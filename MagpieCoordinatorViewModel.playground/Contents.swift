@@ -72,12 +72,16 @@ class MyViewController: UIViewController {
     var myLabel: UILabel?
 
     override func loadView() {
+        self.viewModel.observer = self
+
         let view = UIView()
         view.backgroundColor = .white
 
         let label = UILabel()
-        label.frame = CGRect(x: 150, y: 200, width: 200, height: 20)
+        label.frame = CGRect(x: 50, y: 200, width: 250, height: 100)
         label.text = "I report on failures!"
+        label.textAlignment = .center
+        label.numberOfLines = 0
         label.textColor = .black
 
         self.myLabel = label
@@ -85,10 +89,10 @@ class MyViewController: UIViewController {
         self.view = view
 
         let button = UIButton()
-        button.frame = CGRect(x:50, y:400, width: 200, height: 60)
-        button.titleLabel?.text = "Levitate"
+        button.frame = CGRect(x:50, y:400, width: 250, height: 60)
         button.backgroundColor = .black
-        button.tintColor = .white
+        button.setTitle("LEVITATE", for: .normal)
+        button.titleLabel?.textColor = .white
         view.addSubview(button)
 
         button.addTarget(self, action: #selector(self.didTapLevitate), for: UIControlEvents.touchUpInside)
