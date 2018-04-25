@@ -78,7 +78,7 @@ class MyViewController: UIViewController {
         view.backgroundColor = .white
 
         let label = UILabel()
-        label.frame = CGRect(x: 50, y: 200, width: 250, height: 100)
+        label.frame = CGRect(x: 0, y: 200, width: 375, height: 100)
         label.text = "I report on failures!"
         label.textAlignment = .center
         label.numberOfLines = 0
@@ -89,9 +89,10 @@ class MyViewController: UIViewController {
         self.view = view
 
         let button = UIButton()
-        button.frame = CGRect(x:50, y:400, width: 250, height: 60)
+        button.frame = CGRect(x:62, y:400, width: 250, height: 60)
         button.backgroundColor = .black
         button.setTitle("LEVITATE", for: .normal)
+        button.titleLabel?.font = UIFont.boldSystemFont(ofSize: 25)
         button.titleLabel?.textColor = .white
         view.addSubview(button)
 
@@ -99,7 +100,14 @@ class MyViewController: UIViewController {
     }
 
     func updatePropertyViews() {
-        self.myLabel?.text = self.viewModel.property
+        UIView.animate(withDuration: 0.5, animations: {
+            self.myLabel?.alpha = 0
+        }) { _ in
+            self.myLabel?.text = self.viewModel.property
+            UIView.animate(withDuration: 1, animations: {
+                self.myLabel?.alpha = 1
+            })
+        }
     }
 
     @objc func didTapLevitate() {
