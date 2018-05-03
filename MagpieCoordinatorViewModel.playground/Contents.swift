@@ -3,77 +3,140 @@
 import UIKit
 import PlaygroundSupport
 
+// Mark: Utilities
+
+class Utils {
+
+    class func runOnMainAfterDelay(_ delay: Double, block: @escaping ()->()) {
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + Double(Int64(delay * Double(NSEC_PER_SEC))) / Double(NSEC_PER_SEC), execute: block)
+    }
+
+}
+
+class Observable<T> {
+
+    typealias Listener = (T) -> Void
+    var listeners: [Listener] = []
+
+    var value: T {
+        didSet {
+            self.emit()
+        }
+    }
+
+    init(_ value: T) {
+        self.value = value
+    }
+
+    func observe(listener: @escaping Listener) {
+        self.listeners.append(listener)
+        listener(self.value)
+    }
+
+    func emit() {
+        for listener in self.listeners {
+            listener(self.value)
+        }
+    }
+
+}
+
+
 // Mark: Protocols
 
-protocol MyViewControllerNavigationDelegate {
-    func didSelectLevetate(failureHandler: LevitateFailureHandler)
+protocol LevitationServiceProtocol {
+    func attemptToLevitate ()
+    var levitationResult: Observable<Bool?> { get }
 }
 
-protocol PropertyObserver {
-    func propertyDidChange()
+protocol LevitationViewControllerDelegate {
+    func didSelectLevitate()
 }
 
-protocol LevitateFailureHandler {
-    func levitationDidFail(message: String)
+// Mark: Service
+
+class LevitationService: LevitationServiceProtocol {
+
+    var levitationResult: Observable<Bool?> = Observable(nil)
+
+    func attemptToLevitate () {
+        print("service is aempting")
+        self.levitateApiCall()
+    }
+
+    func levitateApiCall (){
+        print("wait for it")
+        Utils.runOnMainAfterDelay(1, block: {
+            print("BOOOM")
+            var newValue = false
+            if let currentValue = self.levitationResult.value {
+                newValue = !currentValue
+            }
+            self.levitationResult.value = newValue
+        })
+    }
+
 }
 
 // Mark: Coordinator
 
 class MyCoordinator {
 
-    func levitate(failureHandler: LevitateFailureHandler) {
-        print("OH NO, we failed to levitate")
-        failureHandler.levitationDidFail(message: "The force is weak with you")
+    var levitationService: LevitationService = LevitationService()
+    var levitationModel: Observable<Bool?> = Observable(nil)
+
+    func levitate() {
+        print("Here we go, levitation incoming")
+        self.levitationService.attemptToLevitate()
+    }
+
+    func start() -> LevitationViewController {
+        // First, observe one's services and make sure models are being updated
+        self.levitationService.levitationResult.observe(listener: { (result:Bool?) in
+            self.levitationModel.value = result
+            print(result)
+        })
+        // Then construct the initial view controller and model
+        let viewModel = LevitationViewModel(coordinator: self)
+        return LevitationViewController.getInstance(viewModel: viewModel, delegate: self)
     }
 
 }
 
-extension MyCoordinator: MyViewControllerNavigationDelegate {
-
-    func didSelectLevetate(failureHandler: LevitateFailureHandler) {
-        self.levitate(failureHandler: failureHandler)
+extension MyCoordinator: LevitationViewControllerDelegate {
+    func didSelectLevitate() {
+        print("Selected to Levitate")
+        self.levitate()
     }
-
 }
 
-// Mark: ViewModels
+class LevitationViewModel {
+    var levitationState: Observable<Bool?> = Observable(nil)
 
-class MyViewModel {
-
-    var observer: PropertyObserver?
-    var property: String = "No Failures" {
-        didSet {
-            if oldValue != self.property {
-                self.updateProperty()
-            }
-        }
+    init(coordinator: MyCoordinator) {
+        coordinator.levitationModel.observe(listener: { (result:Bool?) in
+            self.levitationState.value = result
+        })
     }
-
-    func updateProperty() {
-        self.observer?.propertyDidChange()
-    }
-
 }
 
-extension MyViewModel: LevitateFailureHandler {
-
-    func levitationDidFail(message: String) {
-        self.property = message
-    }
-
-}
 
 // Mark: ViewController
 
-class MyViewController: UIViewController {
+class LevitationViewController: UIViewController {
 
-    var viewModel = MyViewModel()
-    var navigationDelegate:MyViewControllerNavigationDelegate = MyCoordinator()
+    var viewModel: LevitationViewModel!
+    var delegate: LevitationViewControllerDelegate!
     var myLabel: UILabel?
 
-    override func loadView() {
-        self.viewModel.observer = self
+    class func getInstance (viewModel: LevitationViewModel, delegate: LevitationViewControllerDelegate) -> LevitationViewController {
+        let instanceOfMe = LevitationViewController()
+        instanceOfMe.viewModel = viewModel
+        instanceOfMe.delegate = delegate
+        return instanceOfMe
+    }
 
+    override func loadView() {
         let view = UIView()
         view.backgroundColor = .white
 
@@ -97,33 +160,39 @@ class MyViewController: UIViewController {
         view.addSubview(button)
 
         button.addTarget(self, action: #selector(self.didTapLevitate), for: UIControlEvents.touchUpInside)
+        self.viewModel.levitationState.observe(listener: { (result:Bool?) in
+            self.updatePropertyViews()
+        })
     }
 
     func updatePropertyViews() {
         UIView.animate(withDuration: 0.5, animations: {
             self.myLabel?.alpha = 0
         }) { _ in
-            self.myLabel?.text = self.viewModel.property
+            var message = "I report on Levitation State, of which there is none"
+            if let levitationState = self.viewModel.levitationState.value {
+                message = levitationState ? "Up Up and AWAY" : "You done the bad levetating"
+            }
+            self.myLabel?.text = message
             UIView.animate(withDuration: 1, animations: {
                 self.myLabel?.alpha = 1
             })
         }
     }
 
-    @objc func didTapLevitate() {
-        self.navigationDelegate.didSelectLevetate(failureHandler: self.viewModel)
+    func didSelectLevitate() {
+        self.delegate.didSelectLevitate()
     }
 
-}
-
-extension MyViewController: PropertyObserver {
-
-    func propertyDidChange() {
-        self.updatePropertyViews()
+    @objc func didTapLevitate() {
+        self.didSelectLevitate()
     }
 
 }
 
 // Present the view controller in the Live View window
-PlaygroundPage.current.liveView = MyViewController()
+
+let redundantCoordinator = MyCoordinator()
+
+PlaygroundPage.current.liveView = redundantCoordinator.start()
 
