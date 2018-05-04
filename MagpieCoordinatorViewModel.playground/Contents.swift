@@ -41,6 +41,7 @@ class Observable<T> {
 
 }
 
+typealias LevitationModel = Observable<Bool?>
 
 // Mark: Protocols
 
@@ -83,7 +84,7 @@ class LevitationService: LevitationServiceProtocol {
 class MyCoordinator {
 
     var levitationService: LevitationService = LevitationService()
-    var levitationModel: Observable<Bool?> = Observable(nil)
+    var levitationModel: LevitationModel = Observable(nil)
 
     func levitate() {
         print("Here we go, levitation incoming")
@@ -97,7 +98,8 @@ class MyCoordinator {
             print(result)
         })
         // Then construct the initial view controller and model
-        let viewModel = LevitationViewModel(coordinator: self)
+        let viewModel = LevitationViewModel(levitationService: self.levitationService)
+        //let viewModel = LevitationViewModel(levitationModel: self.levitationModel)
         return LevitationViewController.getInstance(viewModel: viewModel, delegate: self)
     }
 
@@ -111,12 +113,30 @@ extension MyCoordinator: LevitationViewControllerDelegate {
 }
 
 class LevitationViewModel {
-    var levitationState: Observable<Bool?> = Observable(nil)
+    var levitationMessage: Observable<String> = Observable("I report on Levitation State, of which there is none")
+    // No clear advantage to keeping a refrence to the service any one if data flow is one way
+    // We should never need to call it, only listen/observe.
+    var levitationService: LevitationService?
 
-    init(coordinator: MyCoordinator) {
-        coordinator.levitationModel.observe(listener: { (result:Bool?) in
-            self.levitationState.value = result
+    init (levitationService: LevitationService) {
+        self.levitationService = levitationService
+        levitationService.levitationResult.observe(listener: { (result:Bool?) in
+            self.setMessage(levitationState: result)
         })
+    }
+
+    init (levitationModel: LevitationModel) {
+        levitationModel.observe(listener: { (result:Bool?) in
+            self.setMessage(levitationState: result)
+        })
+    }
+
+    private func setMessage (levitationState:Bool?) {
+        var message = "I report on Levitation State, of which there is none"
+        if let levitationState = levitationState {
+            message = levitationState ? "Up Up and AWAY" : "You done the bad levetating"
+        }
+        self.levitationMessage.value = message
     }
 }
 
@@ -160,7 +180,7 @@ class LevitationViewController: UIViewController {
         view.addSubview(button)
 
         button.addTarget(self, action: #selector(self.didTapLevitate), for: UIControlEvents.touchUpInside)
-        self.viewModel.levitationState.observe(listener: { (result:Bool?) in
+        self.viewModel.levitationMessage.observe(listener: { _ in
             self.updatePropertyViews()
         })
     }
@@ -169,11 +189,7 @@ class LevitationViewController: UIViewController {
         UIView.animate(withDuration: 0.5, animations: {
             self.myLabel?.alpha = 0
         }) { _ in
-            var message = "I report on Levitation State, of which there is none"
-            if let levitationState = self.viewModel.levitationState.value {
-                message = levitationState ? "Up Up and AWAY" : "You done the bad levetating"
-            }
-            self.myLabel?.text = message
+            self.myLabel?.text = self.viewModel.levitationMessage.value
             UIView.animate(withDuration: 1, animations: {
                 self.myLabel?.alpha = 1
             })
