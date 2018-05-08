@@ -61,7 +61,7 @@ class LevitationService: LevitationServiceProtocol {
     var levitationResult: Observable<Bool?> = Observable(nil)
 
     func attemptToLevitate () {
-        print("service is aempting")
+        print("service is attempting to levitate")
         self.levitateApiCall()
     }
 
