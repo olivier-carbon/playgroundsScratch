@@ -41,13 +41,15 @@ class Observable<T> {
 
 }
 
-typealias LevitationModel = Observable<Bool?>
-
 // Mark: Protocols
 
 protocol LevitationServiceProtocol {
     func attemptToLevitate ()
-    var levitationResult: Observable<Bool?> { get }
+}
+
+protocol LevitationModelProtocol {
+    var state: Observable<Bool?> { get }
+    func attemptToLevitate ()
 }
 
 protocol LevitationViewControllerDelegate {
@@ -62,44 +64,53 @@ class LevitationService: LevitationServiceProtocol {
 
     func attemptToLevitate () {
         print("service is attempting to levitate")
-        self.levitateApiCall()
+        self.levitateApiCall { (result:Bool?) in
+            self.levitationResult.value = result
+        }
     }
 
-    func levitateApiCall (){
+    func levitateApiCall (_ completionHandler: @escaping (_:Bool?) -> Void){
         print("wait for it")
         Utils.runOnMainAfterDelay(1, block: {
-            print("BOOOM")
-            var newValue = false
-            if let currentValue = self.levitationResult.value {
-                newValue = !currentValue
-            }
-            self.levitationResult.value = newValue
+            completionHandler(false)
         })
     }
 
+}
+
+// Mark: Model
+
+class LevitationModel: LevitationModelProtocol {
+
+    var state: Observable<Bool?> = Observable(nil)
+    private var levitationService: LevitationService = LevitationService()
+
+    func attemptToLevitate() {
+        self.levitationService.levitateApiCall { (result: Bool?) in
+            print("BOOOM")
+            var newValue = false
+            if let currentValue = self.state.value {
+                newValue = !currentValue
+            }
+            self.state.value = newValue
+        }
+    }
 }
 
 // Mark: Coordinator
 
 class MyCoordinator {
 
-    var levitationService: LevitationService = LevitationService()
-    var levitationModel: LevitationModel = Observable(nil)
+    var levitationModel: LevitationModel = LevitationModel()
 
     func levitate() {
         print("Here we go, levitation incoming")
-        self.levitationService.attemptToLevitate()
+        self.levitationModel.attemptToLevitate()
     }
 
     func start() -> LevitationViewController {
-        // First, observe one's services and make sure models are being updated
-        self.levitationService.levitationResult.observe(listener: { (result:Bool?) in
-            self.levitationModel.value = result
-            print(result)
-        })
         // Then construct the initial view controller and model
-        let viewModel = LevitationViewModel(levitationService: self.levitationService)
-        //let viewModel = LevitationViewModel(levitationModel: self.levitationModel)
+        let viewModel = LevitationViewModel(levitationModel: self.levitationModel)
         return LevitationViewController.getInstance(viewModel: viewModel, delegate: self)
     }
 
@@ -113,20 +124,13 @@ extension MyCoordinator: LevitationViewControllerDelegate {
 }
 
 class LevitationViewModel {
+    // Need to figure out how we deal with complex state
     var levitationMessage: Observable<String> = Observable("I report on Levitation State, of which there is none")
-    // No clear advantage to keeping a refrence to the service any one if data flow is one way
-    // We should never need to call it, only listen/observe.
-    var levitationService: LevitationService?
-
-    init (levitationService: LevitationService) {
-        self.levitationService = levitationService
-        levitationService.levitationResult.observe(listener: { (result:Bool?) in
-            self.setMessage(levitationState: result)
-        })
-    }
+    private var levitationModel: LevitationModel!
 
     init (levitationModel: LevitationModel) {
-        levitationModel.observe(listener: { (result:Bool?) in
+        self.levitationModel = levitationModel
+        levitationService.state.observe(listener: { (result:Bool?) in
             self.setMessage(levitationState: result)
         })
     }
